@@ -62,6 +62,48 @@ int main(int argc, char *argv[])
         return 2;
     }
 
+    // create a larger buffer to send data
+    int sndbuf = 4 * 1024 * 1024;
+    setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf));
+
+    char buf[MAX_CHUNK_SIZE];
+    size_t bytes_read;
+    long total_bytes_sent = 0;
+    long total_packets = 0;
+
+    printf("sender: starting transfer of %s to %s:%s (chunk size %d)\n",
+           filepath, hostname, port, chunk_size);
+
+    auto start_time = std::chrono::steady_clock::now(); //start timing the transmission rate
+
+    while ((bytes_read = fread(buf, 1, chunk_size, fp)) > 0) {
+        ssize_t sent = sendto(sockfd, buf, bytes_read, 0,
+                               p->ai_addr, p->ai_addrlen);
+        if (sent == -1) {
+            perror("sender: sendto");
+            fclose(fp);
+            close(sockfd);
+            exit(1);
+        }
+        total_bytes_sent += sent;
+        total_packets++;
+    }
+
+    if (ferror(fp)) {
+        perror("sender: fread");
+    }
+
+    //use an empty datagram, with length 0 to signal the end of the file
+    sendto(sockfd, NULL, 0, 0, p->ai_addr, p->ai_addrlen);
+
+    auto end_time = std::chrono::steady_clock::now(); //stop timing the transmissionr ate
+    double elapsed_sec = std::chrono::duration<double>(end_time - start_time).count();
+    double mbps = (total_bytes_sent * 8.0 / 1000000.0) / elapsed_sec;
+
+    printf("sender: done. sent %ld bytes in %ld packets\n", total_bytes_sent, total_packets);
+    printf("sender: elapsed time (first byte sent -> EOF marker sent): %.4f sec\n", elapsed_sec);
+    printf("sender: throughput: %.2f Mbps\n", mbps);
+
     freeaddrinfo(servinfo);
     fclose(fp);
     close(sockfd);
