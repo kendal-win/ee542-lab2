@@ -94,25 +94,29 @@ int main(int argc, char *argv[])
     auto start_time = std::chrono::steady_clock::now(); //start timing the transmission rate
 
     //loop through the number of chunks we're sending
-    for (uint32_t seq = 0; seq < total_chunks; seq++) {
-        size_t bytes_read = fread(payload, 1, chunk_size, fp);
-        if (bytes_read == 0) break; // shouldn't happen given total_chunks calc
+    for (int pass = 0; pass < redundancy; pass++) {
+        fseek(fp, 0, SEEK_SET);
  
-        uint32_t seq_net = seq;
-        uint32_t total_net = total_chunks;
-        memcpy(packet, &seq_net, sizeof(seq_net));
-        memcpy(packet + sizeof(seq_net), &total_net, sizeof(total_net));
+        for (uint32_t seq = 0; seq < total_chunks; seq++) {
+            size_t bytes_read = fread(payload, 1, chunk_size, fp);
+            if (bytes_read == 0) break; // shouldn't happen given total_chunks calc
  
-        for (int r = 0; r < redundancy; r++) { //retransmit each chunk 'r' times for redundancy
-            ssize_t sent = sendto(sockfd, packet, HEADER_SIZE + bytes_read, 0,
-                                   p->ai_addr, p->ai_addrlen);
+            uint32_t seq_net = seq;
+            uint32_t total_net = total_chunks;
+            memcpy(packet, &seq_net, sizeof(seq_net));
+            memcpy(packet + sizeof(seq_net), &total_net, sizeof(total_net));
+ 
+            ssize_t sent = sendto(sockfd, packet, HEADER_SIZE + bytes_read, 0, p->ai_addr, p->ai_addrlen);
             if (sent == -1) {
                 perror("sender: sendto");
                 continue;
             }
             total_packets_sent++;
+ 
+            if (pass == 0) {
+                total_bytes_sent += bytes_read; // count unique payload bytes once
+            }
         }
-        total_bytes_sent += bytes_read; // count unique payload bytes, not redundant copies
     }
  
     auto end_time = std::chrono::steady_clock::now(); //end timing
