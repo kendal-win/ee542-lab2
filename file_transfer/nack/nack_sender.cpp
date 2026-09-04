@@ -317,7 +317,7 @@ int main(int argc, char *argv[])
         auto now = std::chrono::steady_clock::now();
 
         double wait_sec = std::chrono::duration<double>(now - nack_wait_start).count();
-        if(wait_sec > 10.0) {
+        if(wait_sec > 60.0) {
             printf("sender: NACK wait period expired.\n");
             break;
         }
