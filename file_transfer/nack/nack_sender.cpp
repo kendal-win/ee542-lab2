@@ -272,6 +272,7 @@ int main(int argc, char *argv[])
             sendto(sockfd, packet, HEADER_SIZE + bytes_read, 0, dest->ai_addr, dest->ai_addrlen);
             total_packets_sent++;
             total_data_bytes_sent += bytes_read;
+            usleep(120);
 
             for (int i = 0; i < chunk_size; i++) parity_accum[i] ^= payload[i];
         }
