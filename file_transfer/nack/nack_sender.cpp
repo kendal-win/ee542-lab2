@@ -122,34 +122,41 @@ static void retransmit_chunks(
     }
 }
 
-static bool receive_nack(
-    uint32_t &nack_id,
-    std::vector<uint32_t> &missing)
-{
-    char nack_packet[65536];
+enum ControlMessage {
+    CONTROL_NONE,
+    CONTROL_NACK,
+    CONTROL_DONE
+};
 
+static ControlMessage receive_control(uint32_t &nack_id, std::vector<uint32_t> &missing)
+{
+    char control_packet[65536];
     struct sockaddr_storage sender_addr;
     socklen_t sender_addr_len = sizeof(sender_addr);
 
     ssize_t numbytes = recvfrom(
         sockfd,
-        nack_packet,
-        sizeof(nack_packet),
+        control_packet,
+        sizeof(control_packet),
         MSG_DONTWAIT,
         (struct sockaddr *)&sender_addr,
         &sender_addr_len
     );
-
-    if (numbytes < 0){
-        return false;
+    if(numbytes < 0) {
+        return CONTROL_NONE;
+    }
+    
+    //DONE is a single byte containing TYPE_DONE
+    if(numbytes == 1 && (uint8_t)control_packet[0] == TYPE_DONE) {
+        return CONTROL_DONE;
     }
 
-    return parse_nack(
-        nack_packet,
-        (size_t)numbytes,
-        nack_id,
-        missing
-    );
+    //Otherwise, try to parse it as a NACK
+    if (parse_nack(control_packet, (size_t)numbytes, nack_id, missing)) {
+        return CONTROL_NACK;
+    }
+
+    return CONTROL_NONE;
 }
 
 int main(int argc, char *argv[])
@@ -294,32 +301,29 @@ int main(int argc, char *argv[])
     }
 
     // Wait for NACKs and retransmit requested chunks
-    printf("sender: initial transmission complete. Waiting for NACKs...\n");
+    //Sender stays alive until the receiver sends DONE
+    printf("sender: initial transmission complete. Waiting for NACKs or DONE...\n");
 
-    auto nack_wait_start = std::chrono::steady_clock::now();
-
-    while (true) {
+    while(true) {
         uint32_t nack_id;
         std::vector<uint32_t> missing;
 
-        if(receive_nack(nack_id, missing)) {
-            // Ignore duplicate copies of the same NACK
+        ControlMessage message = receive_control(nack_id, missing);
+
+        if(message == CONTROL_DONE) {
+            printf("sender: received DONE from receiver.\n");
+            break;
+        }
+        if (message == CONTROL_NACK) {
+            //Ignore duplicate copies of the same NACK.
             if (nack_id == last_nack_id) {
                 printf("sender: ignoring duplicate NACK ID %u.\n", nack_id);
-                continue;
+            } else {
+                last_nack_id = nack_id;
+                printf("sender:received NACK ID %u requesting %zu chunk(s).\n", nack_id, missing.size());
+                retransmit_chunks(fp, missing, chunk_size, total_chunks, file_size);
+                printf("sender: retransmitted %zu requested chunk(s).\n", missing.size());
             }
-            last_nack_id = nack_id;
-            printf("sender: received NACK ID %u requesting %zu chunk(s).\n", nack_id, missing.size());
-            retransmit_chunks(fp, missing, chunk_size, total_chunks, file_size);
-            printf("sender: retransmitted %zu requested chunk(s).\n", missing.size());
-        }
-
-        auto now = std::chrono::steady_clock::now();
-
-        double wait_sec = std::chrono::duration<double>(now - nack_wait_start).count();
-        if(wait_sec > 60.0) {
-            printf("sender: NACK wait period expired.\n");
-            break;
         }
         usleep(1000);
     }
