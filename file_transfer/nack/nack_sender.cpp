@@ -124,7 +124,7 @@ static void retransmit_chunks(
 
         //sendto(sockfd, &recovery_done, sizeof(recovery_done), 0, dest->ai_addr, dest->ai_addrlen);
 
-        usleep(120);
+        usleep(100);
 
     }
 }
