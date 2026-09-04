@@ -419,6 +419,7 @@ int main(int argc, char *argv[])
             }
             //Sender finished retransmitting this NACK batch
             if(numbytes == 1 && (uint8_t)packet[0] == TYPE_RECOVERY_DONE) {
+                usleep(250000); // allow retransmissions in flight to arrive
                 break;
             }
             if((size_t)numbytes < HEADER_SIZE) {
