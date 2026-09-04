@@ -271,6 +271,8 @@ int main(int argc, char *argv[])
 
         if (total_chunks > 0 && unique_chunks_received == (long)total_chunks) {
             printf("receiver: all %u chunks received directly (no recovery needed).\n", total_chunks);
+            send_done(sockfd, their_addr, addr_len);
+            printf("receiver: sent DONE to sender.\n");
             break;
         }
     }
@@ -429,11 +431,20 @@ int main(int argc, char *argv[])
                     unique_chunks_received++;
                     printf("receiver: received transmitted chunk %u (%ld/%u).\n", seq, unique_chunks_received, total_chunks);
                     end_time = std::chrono::steady_clock::now();
+
+                    //Check whether this retransmission completed the file
+                    if(unique_chunks_received == (long)total_chunks){
+                        printf("receiver: all %u chunks received.\n", total_chunks);
+                        send_done(sockfd, their_addr, addr_len);
+                        printf("receiver: sent DONE to sender.\n");
+                        break;
+                    }
                 }
             }
         }
     }
 
+    unrecoverable = (long)total_chunks - unique_chunks_received;
     double elapsed_sec = std::chrono::duration<double>(end_time - start_time).count();
     double mbps = elapsed_sec > 0
         ? ((unique_chunks_received * (double)chunk_size * 8.0) / 1000000.0) / elapsed_sec
