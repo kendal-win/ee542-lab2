@@ -119,14 +119,10 @@ static void send_done(
     socklen_t sender_addr_len)
 {
     uint8_t done = TYPE_DONE;
-    sendto(
-        sockfd,
-        &done,
-        sizeof(done),
-        0,
-        (const struct sockaddr *)&sender_addr,
-        sender_addr_len
-    );
+    for(int i = 0; i<5; i++) {
+        sendto(sockfd, &done, sizeof(done), 0, (const struct sockaddr *)&sender_addr, sender_addr_len);
+    }
+    usleep(50000);
 }
 
 int main(int argc, char *argv[])
