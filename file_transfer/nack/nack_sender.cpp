@@ -19,6 +19,7 @@
 #define TYPE_PARITY 1
 #define TYPE_NACK 2
 #define TYPE_DONE 3
+#define TYPE_RECOVERY_DONE 4
 #define HEADER_SIZE (1 + 4 + 4 + 8)
 #define NACK_HEADER_SIZE (4 + 4)
 
@@ -118,6 +119,11 @@ static void retransmit_chunks(
             dest->ai_addr,
             dest->ai_addrlen
         );
+
+        uint8_t recovery_done = TYPE_RECOVERY_DONE;
+
+        sendto(sockfd, &recovery_done, sizeof(recovery_done), 0, dest->ai_addr, dest->ai_addrlen);
+
         usleep(120);
 
     }

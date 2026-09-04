@@ -18,6 +18,7 @@
 #define TYPE_PARITY 1
 #define TYPE_NACK 2
 #define TYPE_DONE 3
+#define TYPE_RECOVERY_DONE 4
 #define HEADER_SIZE (1 + 4 + 4 + 8)
 #define NACK_HEADER_SIZE (4 + 4)
 
@@ -140,7 +141,7 @@ int main(int argc, char *argv[])
     int chunk_size = atoi(argv[3]);
     uint32_t group_size = (uint32_t)atoi(argv[4]);
     int timeout_sec = atoi(argv[5]);
-    int recovery_timeout_ms = 3000;
+    int recovery_timeout_ms = 1000;
 
     if (chunk_size <= 0 || chunk_size > MAX_CHUNK_SIZE) {
         fprintf(stderr, "chunk_size must be between 1 and %d\n", MAX_CHUNK_SIZE);
@@ -414,6 +415,10 @@ int main(int argc, char *argv[])
             );
             if(numbytes == -1) {
                // printf("receiver: timed out waiting for retransmissions.\n");
+                break;
+            }
+            //Sender finished retransmitting this NACK batch
+            if(numbytes == 1 && (uint8_t)packet[0] == TYPE_RECOVERY_DONE) {
                 break;
             }
             if((size_t)numbytes < HEADER_SIZE) {
