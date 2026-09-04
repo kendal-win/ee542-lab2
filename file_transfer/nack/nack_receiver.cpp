@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
     int chunk_size = atoi(argv[3]);
     uint32_t group_size = (uint32_t)atoi(argv[4]);
     int timeout_sec = atoi(argv[5]);
-    int recovery_timeout_ms = 300;
+    int recovery_timeout_ms = 200;
 
     if (chunk_size <= 0 || chunk_size > MAX_CHUNK_SIZE) {
         fprintf(stderr, "chunk_size must be between 1 and %d\n", MAX_CHUNK_SIZE);
