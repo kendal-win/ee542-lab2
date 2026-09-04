@@ -468,6 +468,7 @@ int main(int argc, char *argv[])
            unique_chunks_received - recovered, total_chunks);
     printf("receiver: chunks recovered via XOR: %ld\n", recovered);
     printf("receiver: chunks still missing (unrecoverable): %ld\n", unrecoverable);
+    printf("receiver: recovery rounds: %d\n", recovery_round);
     printf("receiver: elapsed time (first byte -> last unique byte): %.4f sec\n", elapsed_sec);
     printf("receiver: throughput (unique payload): %.2f Mbps\n", mbps);
 
