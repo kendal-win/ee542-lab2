@@ -292,6 +292,7 @@ int main(int argc, char *argv[])
 
     while (total_chunks > 0 && unique_chunks_received < (long)total_chunks) {
         recovery_round++;
+        auto round_start = std::chrono::steady_clock::now();
 
         printf("\nreceiver: ===== recovery round %d =====\n", recovery_round);
         
@@ -450,6 +451,10 @@ int main(int argc, char *argv[])
                 }
             }
         }
+
+        auto round_end = std::chrono::steady_clock::now();
+        double round_time = std::chrono::duration<double>(round_end - round_start).count();
+        printf("receiver: recovery round took %.3f seconds\n", round_time);
     }
 
     unrecoverable = (long)total_chunks - unique_chunks_received;
