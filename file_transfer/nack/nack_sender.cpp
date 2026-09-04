@@ -310,7 +310,14 @@ int main(int argc, char *argv[])
 
     // Wait for NACKs and retransmit requested chunks
     //Sender stays alive until the receiver sends DONE
-    printf("sender: initial transmission complete. Waiting for NACKs or DONE...\n");
+    //printf("sender: initial transmission complete. Waiting for NACKs or DONE...\n");
+    auto initial_end_time = std::chrono::steady_clock::now();
+
+    double initial_elapsed_sec = std::chrono::duration<double>(initial_end_time - start_time).count();
+
+    printf("sender: initial transmission complete.\n");
+    printf("sender: initial transmission time: %.4f sec\n", initial_elapsed_sec);
+    printf("sender: waiting for NACKs or DONE...\n");
 
     while(true) {
         uint32_t nack_id;
