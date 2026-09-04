@@ -26,7 +26,7 @@ struct NackHeader {
     uint32_t missing_count;
 };
 
-#define MAX_NACK_ENTRIES 1000
+#define MAX_NACK_ENTRIES 360
 #define NACK_RETRIES 1
 
 static void send_nack(

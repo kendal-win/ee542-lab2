@@ -118,6 +118,7 @@ static void retransmit_chunks(
             dest->ai_addr,
             dest->ai_addrlen
         );
+        usleep(120);
 
     }
 }
