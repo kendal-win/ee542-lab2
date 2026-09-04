@@ -27,7 +27,7 @@ struct NackHeader {
 };
 
 #define MAX_NACK_ENTRIES 1000
-#define NACK_RETRIES 3
+#define NACK_RETRIES 1
 
 static void send_nack(
     int sockfd,
@@ -60,6 +60,7 @@ static void send_nack(
         (const struct sockaddr *)&sender_addr,
         sender_addr_len
     );
+    usleep(120);
 }
 
 static std::vector<uint32_t> find_missing_chunks(
