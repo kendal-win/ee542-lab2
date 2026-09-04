@@ -18,6 +18,7 @@
 #define TYPE_DATA 0
 #define TYPE_PARITY 1
 #define TYPE_NACK 2
+#define TYPE_DONE 3
 #define HEADER_SIZE (1 + 4 + 4 + 8)
 #define NACK_HEADER_SIZE (4 + 4)
 
@@ -47,7 +48,7 @@ static bool parse_nack(
         return false;
     }
 
-    nack_id = header.nack_id
+    nack_id = header.nack_id;
 
     missing.resize(header.missing_count);
 
@@ -290,6 +291,37 @@ int main(int argc, char *argv[])
             sendto(sockfd, packet, HEADER_SIZE + chunk_size, 0, dest->ai_addr, dest->ai_addrlen);
             total_packets_sent++;
         }
+    }
+
+    // Wait for NACKs and retransmit requested chunks
+    printf("sender: initial transmission complete. Waiting for NACKs...\n");
+
+    auto nack_wait_start = std::chrono::steady_clock::now();
+
+    while (true) {
+        uint32_t nack_id;
+        std::vector<uint32_t> missing;
+
+        if(receive_nack(nack_id, missing)) {
+            // Ignore duplicate copies of the same NACK
+            if (nack_id == last_nack_id) {
+                printf("sender: ignoring duplicate NACK ID %u.\n", nack_id);
+                continue;
+            }
+            last_nack_id = nack_id;
+            printf("sender: received NACK ID %u requesting %zu chunk(s).\n", nack_id, missing.size());
+            retransmit_chunks(fp, missing, chunk_size, total_chunks, file_size);
+            printf("sender: retransmitted %zu requested chunk(s).\n", missing.size());
+        }
+
+        auto now = std::chrono::steady_clock::now();
+
+        double wait_sec = std::chrono::duration<double>(now - nack_wait_start).count();
+        if(wait_sec > 10.0) {
+            printf("sender: NACK wait period expired.\n");
+            break;
+        }
+        usleep(1000);
     }
 
     auto end_time = std::chrono::steady_clock::now();

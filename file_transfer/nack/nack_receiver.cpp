@@ -16,6 +16,8 @@
 #define MAX_CHUNK_SIZE 9000
 #define TYPE_DATA 0
 #define TYPE_PARITY 1
+#define TYPE_NACK 2
+#define TYPE_DONE 3
 #define HEADER_SIZE (1 + 4 + 4 + 8)
 #define NACK_HEADER_SIZE (4 + 4)
 
@@ -107,6 +109,22 @@ static void send_nacks(
         next_nack_id++;
         offset += count;
     }
+}
+
+static void send_done(
+    int sockfd,
+    const struct sockaddr_storage &sender_addr,
+    socklen_t sender_addr_len)
+{
+    uint8_t done = TYPE_DONE;
+    sendto(
+        sockfd,
+        &done,
+        sizeof(done),
+        0,
+        (const struct sockaddr *)&sender_addr,
+        sender_addr_len
+    );
 }
 
 int main(int argc, char *argv[])
@@ -257,63 +275,105 @@ int main(int argc, char *argv[])
         }
     }
 
-    //Recovery pass: reconstruct single losses per group via XOR
+    //Recovery pass: repeatedly perform XOR recovery and request
+    // retransmission of any chunks that are still missing.
     long recovered = 0;
     long unrecoverable = 0;
 
-    for (uint32_t g = 0; g < num_groups && total_chunks > 0; g++) {
-        uint32_t start = g * group_size;
-        uint32_t end = start + group_size;
-        if (end > total_chunks) end = total_chunks;
+    while (total_chunks > 0 && unique_chunks_received < (long)total_chunks) {
+        recovery_round++;
 
-        std::vector<uint32_t> missing;
-        for (uint32_t seq = start; seq < end; seq++) {
-            if (!received[seq]) missing.push_back(seq);
-        }
-        if (missing.empty()) continue;
+        printf("\nreceiver: ===== recovery round %d =====\n", recovery_round);
+        
+        // -------------------------------------------------------------
+        // XOR recovery pass
+        // -------------------------------------------------------------
+        for(uint32_t g = 0; g < num_groups; g++) {
+            uint32_t start = g * group_size;
+            uint32_t end = start + group_size;
 
-        if (missing.size() == 1 && parity_map.find(g) != parity_map.end()) {
-            uint32_t miss_seq = missing[0];
-            std::vector<char> recon = parity_map[g]; // start from parity bytes
+            if (end > total_chunks) {
+                end = total_chunks;
+            }
 
-            std::vector<char> buf(chunk_size, 0);
+            std::vector<uint32_t> group_missing;
+
             for (uint32_t seq = start; seq < end; seq++) {
-                if (seq == miss_seq) continue;
-                size_t plen = (seq == total_chunks - 1)
-                    ? (size_t)(file_size - (uint64_t)seq * chunk_size)
-                    : (size_t)chunk_size;
-                std::fill(buf.begin(), buf.end(), 0);
-                fseek(out, (long)seq * chunk_size, SEEK_SET);
-                fread(buf.data(), 1, plen, out);
-                for (int i = 0; i < chunk_size; i++) {
-                    recon[i] ^= buf[i];
+                if (!received[seq]) {
+                    group_missing.push_back(seq);
                 }
             }
 
-            size_t out_len = (miss_seq == total_chunks - 1)
-                ? (size_t)(file_size - (uint64_t)miss_seq * chunk_size)
-                : (size_t)chunk_size;
-            fseek(out, (long)miss_seq * chunk_size, SEEK_SET);
-            fwrite(recon.data(), 1, out_len, out);
+            if (group_missing.empty()) {
+                continue;
+            }
 
-            received[miss_seq] = true;
-            unique_chunks_received++;
-            recovered++;
-        } else {
-            unrecoverable += missing.size();
+            // Our XOR parity can recover exactly one missing chunk.
+            if (group_missing.size() == 1 && parity_map.find(g) != parity_map.end()) {
+                uint32_t miss_seq = group_missing[0];
+                std::vector<char> recon = parity_map[g];
+                std::vector<char> buf(chunk_size, 0);
+                for(uint32_t seq = start; seq < end; seq++) {
+                    if(seq == miss_seq) {
+                        continue;
+                    }
+
+                    size_t plen = (seq == total_chunks - 1) ? (size_t)(file_size - (uint64_t)seq * chunk_size) : (size_t)chunk_size;
+                    std::fill(buf.begin(), buf.end(), 0);
+
+                    fseek(out, (long)seq * chunk_size, SEEK_SET);
+
+                    fread(buf.data(), 1, plen, out);
+
+                    for (int i = 0; i < chunk_size; i++) {
+                        recon[i] ^= buf[i];
+                    }
+                }
+
+                size_t out_len = (miss_seq == total_chunks - 1) ? (size_t)(file_size - (uint64_t)miss_seq * chunk_size) : (size_t)chunk_size;
+                
+                fseek(out, (long)miss_seq * chunk_size, SEEK_SET);
+
+                fwrite(recon.data(), 1, out_len, out);
+
+                received[miss_seq] = true;
+                unique_chunks_received++;
+                recovered++;
+
+                printf(
+                    "receiver: XOR recovered chunk %u (group %u).\n", miss_seq, g);
+            }
         }
-    }
 
-    // Find chunks that are still missing after XOR recovery
-    std::vector<uint32_t> missing = find_missing_chunks(received);
+        // --------------------------------------------------------
+        // Check whether the entire file is now complete.
+        // --------------------------------------------------------
+        if(unique_chunks_received == (long)total_chunks) {
+            printf("receiver: all %u chunks received/recovered.\n", total_chunks);
 
-    printf("receiver: %zu chunks still missing after XOR recovery.\n",
-            missing.size());
-    
-    // Send NACKs for missing chunks.
-    if (!missing.empty()) {
-        uint32_t next_nack_id = 0;
+            send_done(
+                sockfd,
+                their_addr,
+                addr_len
+            );
 
+            printf("receiver: sent DONE to sender.\n");
+            break;
+        }
+
+        // --------------------------------------------------------
+        // Find chunks still missing after XOR recovery.
+        // --------------------------------------------------------
+        std::vector<uint32_t> missing = find_missing_chunks(received);
+        unrecoverable = (long)missing.size();
+        printf("receiver: %zu chunks still missing after XOR recovery.\n", missing.size());
+        if (missing.empty()) {
+            break;
+        }
+
+        // ------------------------------------------------------
+        // Send NACKs requesting the missing chunks.
+        // ------------------------------------------------------
         send_nacks(
             sockfd,
             their_addr,
@@ -322,14 +382,13 @@ int main(int argc, char *argv[])
             next_nack_id
         );
 
-        printf("receiver: sent NACKs for %zu missing chunks.\n",
-                missing.size());
-    }
+        printf("receiver: sent NACKs for %zu missing chunks.\n", missing.size());
 
-    if (!missing.empty()) {
+        // -------------------------------------------------------------
+        // Wait for retransmitted DATA packets.
+        // -------------------------------------------------------------
         printf("receiver: waiting for retransmitted chunks...\n");
-
-        while (true) {
+        while(true) {
             addr_len = sizeof(their_addr);
 
             ssize_t numbytes = recvfrom(
@@ -340,19 +399,15 @@ int main(int argc, char *argv[])
                 (struct sockaddr *)&their_addr,
                 &addr_len
             );
-
             if(numbytes == -1) {
                 printf("receiver: timed out waiting for retransmissions.\n");
                 break;
             }
-
-            if ((size_t)numbytes < HEADER_SIZE) {
+            if((size_t)numbytes < HEADER_SIZE) {
                 continue;
             }
-
             uint8_t type = packet[0];
-
-            if(type != TYPE_DATA && type != TYPE_PARITY) {
+            if (type != TYPE_DATA && type != TYPE_PARITY) {
                 continue;
             }
 
@@ -366,20 +421,14 @@ int main(int argc, char *argv[])
 
             if (type == TYPE_DATA) {
                 uint32_t seq = seq_or_gid;
-
-                if(seq < total_chunks && !received[seq]) {
+                if (seq < total_chunks && !received[seq]) {
                     size_t payload_len = numbytes - HEADER_SIZE;
-
                     fseek(out, (long)seq * chunk_size, SEEK_SET);
-                    fwrite(
-                        packet.data() + HEADER_SIZE,
-                        1,
-                        payload_len,
-                        out
-                    );
-
+                    fwrite(packet.data() + HEADER_SIZE, 1, payload_len, out);
                     received[seq] = true;
                     unique_chunks_received++;
+                    printf("receiver: received transmitted chunk %u (%ld/%u).\n", seq, unique_chunks_received, total_chunks);
+                    end_time = std::chrono::steady_clock::now();
                 }
             }
         }
