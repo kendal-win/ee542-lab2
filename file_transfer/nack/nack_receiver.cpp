@@ -139,6 +139,7 @@ int main(int argc, char *argv[])
     int chunk_size = atoi(argv[3]);
     uint32_t group_size = (uint32_t)atoi(argv[4]);
     int timeout_sec = atoi(argv[5]);
+    int recovery_timeout_ms = 1000;
 
     if (chunk_size <= 0 || chunk_size > MAX_CHUNK_SIZE) {
         fprintf(stderr, "chunk_size must be between 1 and %d\n", MAX_CHUNK_SIZE);
@@ -276,6 +277,13 @@ int main(int argc, char *argv[])
             break;
         }
     }
+
+    // Switch to a shorter timeout for retransmission/recovery.
+    struct timeval recovery_tv;
+    recovery_tv.tv_sec = recovery_timeout_ms / 1000;
+    recovery_tv.tv_usec = (recovery_timeout_ms % 1000) * 1000;
+
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &recovery_tv, sizeof(recovery_tv));
 
     //Recovery pass: repeatedly perform XOR recovery and request
     // retransmission of any chunks that are still missing.
