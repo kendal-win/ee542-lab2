@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
     int chunk_size = atoi(argv[3]);
     uint32_t group_size = (uint32_t)atoi(argv[4]);
     int timeout_sec = atoi(argv[5]);
-    int recovery_timeout_ms = 1000;
+    int recovery_timeout_ms = 400;
 
     if (chunk_size <= 0 || chunk_size > MAX_CHUNK_SIZE) {
         fprintf(stderr, "chunk_size must be between 1 and %d\n", MAX_CHUNK_SIZE);
@@ -294,7 +294,7 @@ int main(int argc, char *argv[])
         recovery_round++;
         auto round_start = std::chrono::steady_clock::now();
 
-        printf("\nreceiver: ===== recovery round %d =====\n", recovery_round);
+       // printf("\nreceiver: ===== recovery round %d =====\n", recovery_round);
         
         // -------------------------------------------------------------
         // XOR recovery pass
@@ -351,8 +351,7 @@ int main(int argc, char *argv[])
                 unique_chunks_received++;
                 recovered++;
 
-                printf(
-                    "receiver: XOR recovered chunk %u (group %u).\n", miss_seq, g);
+               // printf("receiver: XOR recovered chunk %u (group %u).\n", miss_seq, g);
             }
         }
 
@@ -377,7 +376,7 @@ int main(int argc, char *argv[])
         // --------------------------------------------------------
         std::vector<uint32_t> missing = find_missing_chunks(received);
         unrecoverable = (long)missing.size();
-        printf("receiver: %zu chunks still missing after XOR recovery.\n", missing.size());
+       // printf("receiver: %zu chunks still missing after XOR recovery.\n", missing.size());
         if (missing.empty()) {
             break;
         }
@@ -393,12 +392,12 @@ int main(int argc, char *argv[])
             next_nack_id
         );
 
-        printf("receiver: sent NACKs for %zu missing chunks.\n", missing.size());
+        //printf("receiver: sent NACKs for %zu missing chunks.\n", missing.size());
 
         // -------------------------------------------------------------
         // Wait for retransmitted DATA packets.
         // -------------------------------------------------------------
-        printf("receiver: waiting for retransmitted chunks...\n");
+        //printf("receiver: waiting for retransmitted chunks...\n");
         while(true) {
             addr_len = sizeof(their_addr);
 
@@ -411,7 +410,7 @@ int main(int argc, char *argv[])
                 &addr_len
             );
             if(numbytes == -1) {
-                printf("receiver: timed out waiting for retransmissions.\n");
+               // printf("receiver: timed out waiting for retransmissions.\n");
                 break;
             }
             if((size_t)numbytes < HEADER_SIZE) {
@@ -438,7 +437,7 @@ int main(int argc, char *argv[])
                     fwrite(packet.data() + HEADER_SIZE, 1, payload_len, out);
                     received[seq] = true;
                     unique_chunks_received++;
-                    printf("receiver: received transmitted chunk %u (%ld/%u).\n", seq, unique_chunks_received, total_chunks);
+                    //printf("receiver: received transmitted chunk %u (%ld/%u).\n", seq, unique_chunks_received, total_chunks);
                     end_time = std::chrono::steady_clock::now();
 
                     //Check whether this retransmission completed the file
@@ -454,7 +453,7 @@ int main(int argc, char *argv[])
 
         auto round_end = std::chrono::steady_clock::now();
         double round_time = std::chrono::duration<double>(round_end - round_start).count();
-        printf("receiver: recovery round took %.3f seconds\n", round_time);
+       // printf("receiver: recovery round took %.3f seconds\n", round_time);
     }
 
     unrecoverable = (long)total_chunks - unique_chunks_received;
