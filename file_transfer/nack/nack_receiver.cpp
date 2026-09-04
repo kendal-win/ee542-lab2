@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
     int chunk_size = atoi(argv[3]);
     uint32_t group_size = (uint32_t)atoi(argv[4]);
     int timeout_sec = atoi(argv[5]);
-    int recovery_timeout_ms = 250;
+    int recovery_timeout_ms = 400;
 
     if (chunk_size <= 0 || chunk_size > MAX_CHUNK_SIZE) {
         fprintf(stderr, "chunk_size must be between 1 and %d\n", MAX_CHUNK_SIZE);
@@ -375,6 +375,7 @@ int main(int argc, char *argv[])
         // Find chunks still missing after XOR recovery.
         // --------------------------------------------------------
         std::vector<uint32_t> missing = find_missing_chunks(received);
+        printf("receiver: NACK requesting %zu chunks\n", missing.size());
         unrecoverable = (long)missing.size();
        // printf("receiver: %zu chunks still missing after XOR recovery.\n", missing.size());
         if (missing.empty()) {
@@ -398,6 +399,7 @@ int main(int argc, char *argv[])
         // Wait for retransmitted DATA packets.
         // -------------------------------------------------------------
         //printf("receiver: waiting for retransmitted chunks...\n");
+        long chunks_before_retransmission = unique_chunks_received;
         while(true) {
             addr_len = sizeof(their_addr);
 
@@ -450,9 +452,9 @@ int main(int argc, char *argv[])
                 }
             }
         }
+        long received_this_round = unique_chunks_received - chunks_before_retransmission;
+        printf("receiver: received %ld retransmitted chunks this round\n", received_this_round);
 
-        auto round_end = std::chrono::steady_clock::now();
-        double round_time = std::chrono::duration<double>(round_end - round_start).count();
        // printf("receiver: recovery round took %.3f seconds\n", round_time);
     }
 
@@ -468,7 +470,7 @@ int main(int argc, char *argv[])
            unique_chunks_received - recovered, total_chunks);
     printf("receiver: chunks recovered via XOR: %ld\n", recovered);
     printf("receiver: chunks still missing (unrecoverable): %ld\n", unrecoverable);
-    printf("receiver: recovery rounds: %d\n", recovery_round);
+    printf("receiver: recovery round: %d\n", recovery_round);
     printf("receiver: elapsed time (first byte -> last unique byte): %.4f sec\n", elapsed_sec);
     printf("receiver: throughput (unique payload): %.2f Mbps\n", mbps);
 
