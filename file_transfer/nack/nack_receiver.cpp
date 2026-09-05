@@ -99,6 +99,7 @@ static void send_nacks(
         );
 
         for(int retry = 0; retry < NACK_RETRIES; retry++) {
+            printf("receiver: sending NACK ID %u, %zu chunks\n", next_nack_id, batch.size());
             send_nack(
                 sockfd,
                 sender_addr,
