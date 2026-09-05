@@ -361,6 +361,11 @@ int main(int argc, char *argv[])
     printf("sender: elapsed time: %.4f sec\n", elapsed_sec);
     printf("sender: effective throughput (unique data only): %.2f Mbps\n", mbps);
 
+    printf("sender: MD5 checksum of original file:\n");
+    char md5_command[1024];
+    snprintf(md5_command, size_of(md5_command), "md5sum \"%s\"", filepath);
+    system(md5_command);
+
     freeaddrinfo(servinfo);
     fclose(fp);
     fclose(parity_scratch);

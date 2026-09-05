@@ -460,6 +460,12 @@ int main(int argc, char *argv[])
     }
 
     fclose(out);
+
+    printf("receiver: MD5 checksum of received file:\n");
+    char md5_command[1024];
+    snprintf(md5_command, sizeof(md5_command), "md5sum \"%s\"", outpath);
+    system(md5_command);
+
     close(sockfd);
     return 0;
 }
