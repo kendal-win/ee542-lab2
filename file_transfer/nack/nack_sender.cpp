@@ -90,6 +90,7 @@ static void retransmit_chunks(
     uint32_t total_chunks,
     uint64_t file_size)
 {
+    auto batch_start = std::chrono::steady_clock::now();
     std::vector<char> packet_buf(HEADER_SIZE + MAX_CHUNK_SIZE);
     char *packet = packet_buf.data();
     char *payload = packet + HEADER_SIZE;
@@ -127,6 +128,10 @@ static void retransmit_chunks(
         usleep(100);
 
     }
+
+    auto batch_end = std::chrono::steady_clock::now();
+    double batch_elapsed = std::chrono::duration<double>(batch_end - batch_start).count();
+    printf("sender: retransmission batch: %zu chunks, %.4f sec\n", missing.size(), batch_elapsed);
 }
 
 enum ControlMessage {
