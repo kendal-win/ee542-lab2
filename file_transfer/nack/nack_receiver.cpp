@@ -224,7 +224,12 @@ int main(int argc, char *argv[])
         ssize_t numbytes = recvfrom(sockfd, packet.data(), packet.size(), 0,
                                      (struct sockaddr *)&their_addr, &addr_len);
         if (numbytes == -1) {
+            auto timeout_time = std::chrono::steady_clock::now();
+            double since_last_packet = std::chrono::duration<double>(timeout_time - end_time).count();
+
             printf("receiver: timed out waiting for more packets, moving to recovery pass.\n");
+            printf("receiver: time since last packet: %.4f sec\n". since_last_packet);
+            
             break;
         }
         if ((size_t)numbytes < HEADER_SIZE) continue;
