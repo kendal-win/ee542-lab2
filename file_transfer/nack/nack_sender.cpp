@@ -19,7 +19,7 @@
 #define TYPE_PARITY 1
 #define TYPE_NACK 2
 #define TYPE_DONE 3
-#define TYPE_RECOVERY_DONE 4
+
 #define TYPE_INITIAL_DONE 5
 #define HEADER_SIZE (1 + 4 + 4 + 8)
 #define NACK_HEADER_SIZE (4 + 4)
@@ -91,7 +91,7 @@ static void retransmit_chunks(
     uint32_t total_chunks,
     uint64_t file_size)
 {
-    auto batch_start = std::chrono::steady_clock::now();
+    //auto batch_start = std::chrono::steady_clock::now();
     std::vector<char> packet_buf(HEADER_SIZE + MAX_CHUNK_SIZE);
     char *packet = packet_buf.data();
     char *payload = packet + HEADER_SIZE;
@@ -122,17 +122,10 @@ static void retransmit_chunks(
             dest->ai_addrlen
         );
 
-        //uint8_t recovery_done = TYPE_RECOVERY_DONE;
-
-        //sendto(sockfd, &recovery_done, sizeof(recovery_done), 0, dest->ai_addr, dest->ai_addrlen);
-
         usleep(100);
 
     }
 
-    auto batch_end = std::chrono::steady_clock::now();
-    double batch_elapsed = std::chrono::duration<double>(batch_end - batch_start).count();
-    printf("sender: retransmission batch: %zu chunks, %.4f sec\n", missing.size(), batch_elapsed);
 }
 
 enum ControlMessage {
@@ -159,7 +152,7 @@ static ControlMessage receive_control(uint32_t &nack_id, std::vector<uint32_t> &
         return CONTROL_NONE;
     }
     
-    //DONE is a single byte containing TYPE_DONE
+    //DONE contains TYPE_DONE
     if(numbytes == 1 && (uint8_t)control_packet[0] == TYPE_DONE) {
         return CONTROL_DONE;
     }
@@ -205,8 +198,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    // Scratch file to hold each group's parity so passes 2..R can
-    // resend it without recomputing (auto-deleted when closed).
+    // Scratch file to hold each group's parity so passes 2..R can resend it without recomputing (auto-deleted when closed).
     FILE *parity_scratch = tmpfile();
     if (!parity_scratch) {
         perror("tmpfile");
@@ -314,9 +306,8 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Wait for NACKs and retransmit requested chunks
+    //Wait for NACKs and retransmit requested chunks
     //Sender stays alive until the receiver sends DONE
-    //printf("sender: initial transmission complete. Waiting for NACKs or DONE...\n");
     auto initial_end_time = std::chrono::steady_clock::now();
 
     double initial_elapsed_sec = std::chrono::duration<double>(initial_end_time - start_time).count();
@@ -345,18 +336,14 @@ int main(int argc, char *argv[])
             break;
         }
         if (message == CONTROL_NACK) {
-            auto nack_received_time = std::chrono::steady_clock::now();
-            //Ignore duplicate copies of the same NACK.
+
             if (nack_id == last_nack_id) {
-                printf("sender: ignoring duplicate NACK ID %u.\n", nack_id);
+                //printf("sender: ignoring duplicate NACK ID %u.\n", nack_id);
             } else {
                 last_nack_id = nack_id;
-                auto retransmission_start_time = std::chrono::steady_clock::now();
-                double nack_to_retransmit = std::chrono::duration<double>(retransmission_start_time - nack_received_time).count();
-                printf("sender: NACK received -> retransmission start: %.4f sec\n", nack_to_retransmit);
-                printf("sender:received NACK ID %u requesting %zu chunk(s).\n", nack_id, missing.size());
+        
                 retransmit_chunks(fp, missing, chunk_size, total_chunks, file_size);
-                printf("sender: retransmitted %zu requested chunk(s).\n", missing.size());
+                //printf("sender: retransmitted %zu requested chunk(s).\n", missing.size());
             }
         }
         usleep(1000);
