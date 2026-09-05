@@ -335,11 +335,15 @@ int main(int argc, char *argv[])
             break;
         }
         if (message == CONTROL_NACK) {
+            auto nack_received_time = std::chrono::steady_clock::now();
             //Ignore duplicate copies of the same NACK.
             if (nack_id == last_nack_id) {
                 printf("sender: ignoring duplicate NACK ID %u.\n", nack_id);
             } else {
                 last_nack_id = nack_id;
+                auto retransmission_start_time = std::chrono::steady_clock::now();
+                double nack_to_retransmit = std::chrono::duration<double>(retransmission_start_time - nack_received_time).count();
+                printf("sender: NACK received -> retransmission start: %.4f sec\n", nack_to_retransmit);
                 printf("sender:received NACK ID %u requesting %zu chunk(s).\n", nack_id, missing.size());
                 retransmit_chunks(fp, missing, chunk_size, total_chunks, file_size);
                 printf("sender: retransmitted %zu requested chunk(s).\n", missing.size());
