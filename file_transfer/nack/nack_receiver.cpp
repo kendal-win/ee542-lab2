@@ -397,7 +397,9 @@ int main(int argc, char *argv[])
         // Wait for retransmitted DATA packets.
         // -------------------------------------------------------------
         //printf("receiver: waiting for retransmitted chunks...\n");
+        auto recovery_wait_start = std::chrono::steady_clock::now();
         long chunks_before_retransmission = unique_chunks_received;
+        bool first_retransmission = true;
         while(true) {
             addr_len = sizeof(their_addr);
 
@@ -411,12 +413,24 @@ int main(int argc, char *argv[])
             );
             if(numbytes == -1) {
                // printf("receiver: timed out waiting for retransmissions.\n");
+                auto recovery_wait_end = std::chrono::steady_clock::now();
+                double recovery_wait_time = std::chrono::duration<double>(recovery_wait_end - recovery_wait_start).count();
+                printf("receiver: recovery wait ended after %.4f sec\n", recovery_wait_time);
+
                 break;
             }
             //Sender finished retransmitting this NACK batch
             // if(numbytes == 1 && (uint8_t)packet[0] == TYPE_RECOVERY_DONE) {
             //     break;
             // }
+            if(first_retransmission) {
+                auto first_retransmission_time = std::chrono::steady_clock::now();
+                double first_delay = std::chrono::duration<double>(first_retransmission_time - recovery_wait_start).count();
+                printf("receiver: first retransmission arrived after %.4f sec\n", first_delay);
+                first_retransmission = false;
+            }
+
+
             if((size_t)numbytes < HEADER_SIZE) {
                 continue;
             }
