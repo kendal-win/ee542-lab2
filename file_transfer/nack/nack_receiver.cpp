@@ -474,6 +474,11 @@ int main(int argc, char *argv[])
     printf("receiver: chunks recovered via XOR: %ld\n", recovered);
     printf("receiver: chunks still missing (unrecoverable): %ld\n", unrecoverable);
     printf("receiver: recovery round: %d\n", recovery_round);
+
+    if(transfer_end_recorded) {
+        printf("receiver: transfer end timestamp: %ld.%09ld\n", transfer_end_ts.tv_sec, transfer_end_ts.tv_nsec);
+    }
+    
     printf("receiver: elapsed time (first byte -> last unique byte): %.4f sec\n", elapsed_sec);
     printf("receiver: throughput (unique payload): %.2f Mbps\n", mbps);
 
