@@ -228,8 +228,8 @@ int main(int argc, char *argv[])
             double since_last_packet = std::chrono::duration<double>(timeout_time - end_time).count();
 
             printf("receiver: timed out waiting for more packets, moving to recovery pass.\n");
-            printf("receiver: time since last packet: %.4f sec\n". since_last_packet);
-            
+            printf("receiver: time since last packet: %.4f sec\n", since_last_packet);
+
             break;
         }
         if ((size_t)numbytes < HEADER_SIZE) continue;
