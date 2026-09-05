@@ -13,6 +13,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <chrono>
+#include <time.h>
 
 #define MAX_CHUNK_SIZE 9000
 #define TYPE_DATA 0
@@ -23,6 +24,8 @@
 #define TYPE_INITIAL_DONE 5
 #define HEADER_SIZE (1 + 4 + 4 + 8)
 #define NACK_HEADER_SIZE (4 + 4)
+
+static struct timespec transfer_start_ts;
 
 struct NackHeader {
     uint32_t nack_id;
@@ -267,6 +270,9 @@ int main(int argc, char *argv[])
             size_t bytes_read = fread(payload, 1, chunk_size, fp);
 
             fill_header(TYPE_DATA, seq);
+            if (seq == 0) {
+                clock_gettime(CLOCK_REALTIME, &transfer_start_ts);
+            }
             sendto(sockfd, packet, HEADER_SIZE + bytes_read, 0, dest->ai_addr, dest->ai_addrlen);
             total_packets_sent++;
             total_data_bytes_sent += bytes_read;
@@ -313,6 +319,7 @@ int main(int argc, char *argv[])
     double initial_elapsed_sec = std::chrono::duration<double>(initial_end_time - start_time).count();
 
     printf("sender: initial transmission complete.\n");
+    printf("sender: transfer start timestamp: %ld.%09ld\n", transfer_start_ts.tv_sec, transfer_start_ts.tv_nsec);
     printf("sender: initial transmission time: %.4f sec\n", initial_elapsed_sec);
 
     uint8_t initial_done = TYPE_INITIAL_DONE;

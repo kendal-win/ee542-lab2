@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <chrono>
+#include <time.h>
 
 #define MAX_CHUNK_SIZE 9000
 #define TYPE_DATA 0
@@ -22,6 +23,8 @@
 #define TYPE_INITIAL_DONE 5
 #define HEADER_SIZE (1 + 4 + 4 + 8)
 #define NACK_HEADER_SIZE (4 + 4)
+
+static struct timespec transfer_start_ts;
 
 struct NackHeader {
     uint32_t nack_id;
@@ -208,6 +211,9 @@ int main(int argc, char *argv[])
 
     bool started = false;
     std::chrono::steady_clock::time_point start_time, end_time;
+    struct timespec last_packet_ts;
+    struct timespec transfer_end_ts;
+    bool transfer_end_recorded = false;
 
     printf("receiver: waiting for data on port %s (timeout %ds after last packet)...\n",
            port, timeout_sec);
@@ -230,6 +236,7 @@ int main(int argc, char *argv[])
             start_time = std::chrono::steady_clock::now();
             started = true;
         }
+        clock_gettime(CLOCK_REALTIME, &last_packet_ts);
         end_time = std::chrono::steady_clock::now();
         total_packets_received++;
 
@@ -251,6 +258,12 @@ int main(int argc, char *argv[])
             uint32_t seq = seq_or_gid;
             if (seq < total_chunks && !received[seq]) {
                 size_t payload_len = numbytes - HEADER_SIZE;
+
+                if(unique_chunks_received + 1 ==(long)total_chunks){
+                    clock_gettime(CLOCK_REALTIME, &transfer_end_ts);
+                    transfer_end_recorded = true;
+                }
+
                 fseek(out, (long)seq * chunk_size, SEEK_SET);
                 fwrite(packet.data() + HEADER_SIZE, 1, payload_len, out);
                 received[seq] = true;
@@ -345,6 +358,11 @@ int main(int argc, char *argv[])
         }
 
         if(unique_chunks_received == (long)total_chunks) {
+            if (!transfer_end_recorded) {
+                transfer_end_ts = last_packet_ts;
+                transfer_end_recorded = true;
+            }
+
             printf("receiver: all %u chunks received/recovered.\n", total_chunks);
 
             send_done(
@@ -402,6 +420,8 @@ int main(int argc, char *argv[])
             if((size_t)numbytes < HEADER_SIZE) {
                 continue;
             }
+            clock_gettime(CLOCK_REALTIME, &last_packet_ts);
+
             uint8_t type = packet[0];
             if (type != TYPE_DATA && type != TYPE_PARITY) {
                 continue;
@@ -428,6 +448,9 @@ int main(int argc, char *argv[])
 
                     //check whether this retransmission completed the file
                     if(unique_chunks_received == (long)total_chunks){
+                        transfer_end_ts = last_packet_ts;
+                        transfer_end_recorded = true;
+
                         printf("receiver: all %u chunks received.\n", total_chunks);
                         send_done(sockfd, their_addr, addr_len);
                         printf("receiver: sent DONE to sender.\n");
