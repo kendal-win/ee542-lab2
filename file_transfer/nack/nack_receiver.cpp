@@ -19,6 +19,7 @@
 #define TYPE_NACK 2
 #define TYPE_DONE 3
 #define TYPE_RECOVERY_DONE 4
+#define TYPE_INITIAL_DONE 5
 #define HEADER_SIZE (1 + 4 + 4 + 8)
 #define NACK_HEADER_SIZE (4 + 4)
 
@@ -230,6 +231,10 @@ int main(int argc, char *argv[])
             printf("receiver: timed out waiting for more packets, moving to recovery pass.\n");
             printf("receiver: time since last packet: %.4f sec\n", since_last_packet);
 
+            break;
+        }
+        if (numbytes == 1 && (uint8_t)packet[0] == TYPE_INITIAL_DONE) {
+            printf("receiver: received INITIAL_DONE from sender.\n");
             break;
         }
         if ((size_t)numbytes < HEADER_SIZE) continue;

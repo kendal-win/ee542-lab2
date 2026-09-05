@@ -20,6 +20,7 @@
 #define TYPE_NACK 2
 #define TYPE_DONE 3
 #define TYPE_RECOVERY_DONE 4
+#define TYPE_INITIAL_DONE 5
 #define HEADER_SIZE (1 + 4 + 4 + 8)
 #define NACK_HEADER_SIZE (4 + 4)
 
@@ -322,7 +323,16 @@ int main(int argc, char *argv[])
 
     printf("sender: initial transmission complete.\n");
     printf("sender: initial transmission time: %.4f sec\n", initial_elapsed_sec);
+
+    uint8_t initial_done = TYPE_INITIAL_DONE;
+    for (int i = 0; i < 5; i++) {
+        sendto(sockfd, &initial_done, sizeof(initial_done), 0, dest->ai_addr, dest->ai_addrlen);
+    }
+    printf("sender: sent INITIAL_DONE.\n");
+
     printf("sender: waiting for NACKs or DONE...\n");
+
+
 
     while(true) {
         uint32_t nack_id;
