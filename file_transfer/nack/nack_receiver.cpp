@@ -472,6 +472,10 @@ int main(int argc, char *argv[])
         long received_this_round = unique_chunks_received - chunks_before_retransmission;
         printf("receiver: received %ld retransmitted chunks this round\n", received_this_round);
 
+        auto round_end = std::chrono::steady_clock::now();
+        double round_time = std::chrono::duration<double>(round_end - round_start).count();
+        printf("receiver: recovery round %d total time: %.4f sec\n". recovery_round, round_time);
+
        // printf("receiver: recovery round took %.3f seconds\n", round_time);
     }
 
