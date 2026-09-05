@@ -474,7 +474,7 @@ int main(int argc, char *argv[])
 
         auto round_end = std::chrono::steady_clock::now();
         double round_time = std::chrono::duration<double>(round_end - round_start).count();
-        printf("receiver: recovery round %d total time: %.4f sec\n". recovery_round, round_time);
+        printf("receiver: recovery round %d total time: %.4f sec\n", recovery_round, round_time);
 
        // printf("receiver: recovery round took %.3f seconds\n", round_time);
     }
