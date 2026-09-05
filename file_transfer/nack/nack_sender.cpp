@@ -363,7 +363,7 @@ int main(int argc, char *argv[])
 
     printf("sender: MD5 checksum of original file:\n");
     char md5_command[1024];
-    snprintf(md5_command, size_of(md5_command), "md5sum \"%s\"", filepath);
+    snprintf(md5_command, sizeof(md5_command), "md5sum \"%s\"", filepath);
     system(md5_command);
 
     freeaddrinfo(servinfo);
